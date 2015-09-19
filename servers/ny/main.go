@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "github.com/zqzca/web/daemon"
 	"io"
 	"io/ioutil"
 	"net/http"
