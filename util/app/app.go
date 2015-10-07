@@ -7,21 +7,23 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"upper.io/db"
+	"upper.io/db/postgresql"
 )
 
 // App encapuslates some common shit
 type App struct {
-	Server *http.Server
-	Router *mux.Router
+	Server   *http.Server
+	Router   *mux.Router
+	Database *db.Database
 
-	port string
-
+	port     string
 	certPath string
 	keyPath  string
 }
 
 // NewApp creates a new App
-func NewApp(port uint16) *App {
+func NewApp(port int) *App {
 	a := &App{}
 
 	certRoot := "/etc/ssl/zqz/zqzca"
@@ -52,6 +54,26 @@ func (a App) Listen() {
 		log.Printf("Starting Application. Listening on port :%s\n", a.port)
 		a.Server.ListenAndServeTLS(a.certPath, a.keyPath)
 	}
+}
+
+// AddDatabase connects to a psql db with the given name.
+func (a App) AddDatabase(name string, user string) {
+	settings := postgresql.ConnectionURL{
+		Database: name,
+		User:     user,
+	}
+
+	database, err := db.Open(postgresql.Adapter, settings)
+
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %s with user %s - %s\n", name, user, err.Error())
+	}
+
+	if err = database.Ping(); err != nil {
+		log.Fatalf("Failed to ping database: %s - %s\n", name, err.Error())
+	}
+
+	a.Database = &database
 }
 
 func (a App) certificatesExist() bool {
