@@ -32,7 +32,32 @@ func TestUserController_CreateUserSuccess(t *testing.T) {
 	}
 }
 
-func TestUserController_CreateUserFailure(t *testing.T) {
+func TestUserController_CreateUserMalformedJSON(t *testing.T) {
+	params := strings.NewReader(
+		`{"users}`,
+	)
+
+	req, err := NewRequest("POST", "http://zqz.ca/", params)
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	w := httptest.NewRecorder()
+	UserCreate(w, req)
+
+	if w.Code != 500 {
+		t.Error("Should have received status 500, got", w.Code)
+	}
+
+	contentType := w.HeaderMap.Get("Content-Type")
+
+	if contentType != "application/json" {
+		t.Error("Should have received content type application/json got", contentType)
+	}
+}
+
+func TestUserController_CreateUserInvalid(t *testing.T) {
 	params := strings.NewReader(
 		`{}`,
 	)

@@ -30,6 +30,8 @@ import (
 //   "error": "no password or whatever"
 // }
 func UserCreate(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
 	u := User{}
 	body, err := ioutil.ReadAll(r.Body)
 
@@ -53,8 +55,6 @@ func UserCreate(w http.ResponseWriter, r *http.Request) {
 	} else {
 		w.WriteHeader(http.StatusBadRequest)
 	}
-
-	w.Header().Set("Content-Type", "application/json")
 }
 
 func usersIndex(w http.ResponseWriter, r *http.Request) {
