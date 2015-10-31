@@ -35,6 +35,12 @@ func expectContentType(t *testing.T, r *Response, expectedContentType string) {
 	}
 }
 
+func expectStringEqual(t *testing.T, s string, e string) {
+	if s != e {
+		t.Error("Expected", s, "got", e)
+	}
+}
+
 func TestUserController_CreateUserSuccess(t *testing.T) {
 	params := `{"first_name":"John", "last_name":"Carmack", "email":"j@id.com"}`
 	res, err := req("POST", "/", params)
@@ -46,6 +52,15 @@ func TestUserController_CreateUserSuccess(t *testing.T) {
 
 	expectStatus(t, res, 201)
 	expectContentType(t, res, "application/json")
+
+	u := &User{}
+	if err := json.NewDecoder(res.Body).Decode(u); err != nil {
+		t.Error("Failed to decode JSON", err.Error())
+	}
+
+	expectStringEqual(t, u.FirstName, "John")
+	expectStringEqual(t, u.LastName, "Carmack")
+	expectStringEqual(t, u.Email, "j@id.com")
 }
 
 func TestUserController_CreateUserMalformedJSON(t *testing.T) {
