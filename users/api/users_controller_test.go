@@ -1,83 +1,86 @@
 package api
 
 import (
+	"encoding/json"
+	"fmt"
+	_ "github.com/davecgh/go-spew/spew"
 	. "net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 )
 
-func TestUserController_CreateUserSuccess(t *testing.T) {
-	params := strings.NewReader(
-		`{"first_name":"John", "last_name":"Carmack", "email":"johnc@idsoftware.com"}`,
-	)
+func req(method string, url string, jsonRequest string) (*Response, error) {
+	params := strings.NewReader(jsonRequest)
+	fullURL := fmt.Sprintf("%s%s", server.URL, url)
+	req, err := NewRequest("POST", fullURL, params)
 
-	req, err := NewRequest("POST", "http://zqz.ca/", params)
+	if err != nil {
+		return nil, err
+	}
+
+	return DefaultClient.Do(req)
+}
+
+func expectStatus(t *testing.T, r *Response, expectedCode int) {
+	if r.StatusCode != expectedCode {
+		t.Error("Should have received status", expectedCode, "got", r.StatusCode)
+	}
+}
+
+func expectContentType(t *testing.T, r *Response, expectedContentType string) {
+	contentType := r.Header.Get("Content-Type")
+
+	if contentType != expectedContentType {
+		t.Error("Should have received Content-Type", expectedContentType, "got", contentType)
+	}
+}
+
+func TestUserController_CreateUserSuccess(t *testing.T) {
+	params := `{"first_name":"John", "last_name":"Carmack", "email":"j@id.com"}`
+	res, err := req("POST", "/", params)
 
 	if err != nil {
 		t.Error(err)
+		return
 	}
 
-	w := httptest.NewRecorder()
-	UserCreate(w, req)
-
-	if w.Code != 201 {
-		t.Error("Should have received status 201, got", w.Code)
-	}
-
-	contentType := w.HeaderMap.Get("Content-Type")
-
-	if contentType != "application/json" {
-		t.Error("Should have received content type application/json got", contentType)
-	}
+	expectStatus(t, res, 201)
+	expectContentType(t, res, "application/json")
 }
 
 func TestUserController_CreateUserMalformedJSON(t *testing.T) {
-	params := strings.NewReader(
-		`{"users}`,
-	)
+	params := `{"users}`
 
-	req, err := NewRequest("POST", "http://zqz.ca/", params)
+	res, err := req("POST", "/", params)
 
 	if err != nil {
 		t.Error(err)
+		return
 	}
 
-	w := httptest.NewRecorder()
-	UserCreate(w, req)
-
-	if w.Code != 500 {
-		t.Error("Should have received status 500, got", w.Code)
-	}
-
-	contentType := w.HeaderMap.Get("Content-Type")
-
-	if contentType != "application/json" {
-		t.Error("Should have received content type application/json got", contentType)
-	}
+	expectStatus(t, res, 500)
+	expectContentType(t, res, "application/json")
 }
 
 func TestUserController_CreateUserInvalid(t *testing.T) {
-	params := strings.NewReader(
-		`{}`,
-	)
+	params := `{}`
 
-	req, err := NewRequest("POST", "http://zqz.ca/", params)
+	res, err := req("POST", "/", params)
 
 	if err != nil {
 		t.Error(err)
 	}
 
-	w := httptest.NewRecorder()
-	UserCreate(w, req)
+	expectStatus(t, res, 400)
+	expectContentType(t, res, "application/json")
 
-	if w.Code != 400 {
-		t.Error("Should have received status 400, got", w.Code)
+	e := &ErrorJSON{}
+	if err := json.NewDecoder(res.Body).Decode(e); err != nil {
+		t.Error("Failed to decode JSON", err.Error())
 	}
 
-	contentType := w.HeaderMap.Get("Content-Type")
-
-	if contentType != "application/json" {
-		t.Error("Should have received content type application/json got", contentType)
+	if len(e.Errors) != 3 {
+		t.Error(e.Errors)
+		t.Error("Should have 3 validation errors. Got", len(e.Errors))
 	}
 }

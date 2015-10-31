@@ -1,30 +1,39 @@
 package api
 
+import (
+	"github.com/asaskevich/govalidator"
+	"strings"
+)
+
 // User is a foo.
 type User struct {
 	ID        string `json:"id,omitempty"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
+	FirstName string `json:"first_name" valid:"required,alphanum"`
+	LastName  string `json:"last_name" valid:"required,alphanum"`
 	Address   string `json:"address"`
 	Phone     string `json:"phone"`
-	Email     string `json:"email"`
-	ApiKey    string `json:"api_key"`
+	Email     string `json:"email" valid:"required,email"`
+	APIKey    string `json:"api_key"`
 
-	errors string
+	errors []string
 }
 
+// Valid return true or false depending on whether or not the User is valid. It
+// additionally sets the errors field on the User to provide information about
+// why the user is not valid
 func (u *User) Valid() bool {
-	if len(u.FirstName) == 0 {
-		return false
+	result, err := govalidator.ValidateStruct(u)
+	if err != nil {
+		u.errors = strings.Split(strings.TrimRight(err.Error(), ";"), ";")
 	}
+	return result
+}
 
-	if len(u.LastName) == 0 {
-		return false
+func validationRequiredFieldBlank(field string) string {
+	str := []string{
+		"Required field",
+		field,
+		"is blank.",
 	}
-
-	if len(u.Email) == 0 {
-		return false
-	}
-
-	return true
+	return strings.Join(str, " ")
 }

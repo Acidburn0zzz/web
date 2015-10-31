@@ -2,20 +2,25 @@ package api
 
 import (
 	"encoding/json"
-	"github.com/davecgh/go-spew/spew"
+	// fuck off
+	_ "github.com/davecgh/go-spew/spew"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 )
 
-// User API
-// POST UserCreate - Create a User
+// ErrorJSON is a simple blew
+type ErrorJSON struct {
+	Errors []string `json:"errors"`
+}
 
+// UserCreate POST - Create a User
+//
 // Response codes
-// 201 if succeeded.
+// 201 if succeeded
 // 400 if bad data
-
+//
 // JSON
 // {
 //   "id": "uuid"
@@ -27,7 +32,10 @@ import (
 //   "apikey": null,
 // }
 // {
-//   "error": "no password or whatever"
+//   "error": [
+//	   "no password or whatever",
+//     "invalid email address",
+//	 ]
 // }
 func UserCreate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -48,12 +56,25 @@ func UserCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	spew.Dump(u)
+	userResponse(w, u)
+}
 
+func userResponse(w http.ResponseWriter, u User) {
 	if u.Valid() {
 		w.WriteHeader(http.StatusCreated)
+
+		if err := json.NewEncoder(w).Encode(u); err != nil {
+			log.Printf("Error: %s\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 	} else {
 		w.WriteHeader(http.StatusBadRequest)
+
+		e := &ErrorJSON{Errors: u.errors}
+		if err := json.NewEncoder(w).Encode(e); err != nil {
+			log.Printf("Error: %s\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 	}
 }
 
