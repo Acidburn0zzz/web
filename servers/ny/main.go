@@ -1,18 +1,20 @@
 package main
 
 import (
-	_ "github.com/zqzca/web/daemon"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"strings"
+
+	_ "github.com/zqzca/web/daemon"
+	"github.com/zqzca/web/util/app"
 )
 
 func handler(w http.ResponseWriter, r *http.Request) {
 	key := "v1"
 	e := `"` + key + `"`
-	w.Header().Set("Etag", e)
-	w.Header().Set("Cache-Control", "max-age=2592000") // 30 days
+	// w.Header().Set("Etag", e)
+	// w.Header().Set("Cache-Control", "max-age=2592000") // 30 days
 
 	if match := r.Header.Get("If-None-Match"); match != "" {
 		if strings.Contains(match, e) {
@@ -33,7 +35,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	http.Handle("/img/", http.StripPrefix("/img/", http.FileServer(http.Dir("./img/"))))
-	http.HandleFunc("/", handler)
-	http.ListenAndServe(":8080", nil)
+	app := app.NewApp(8080)
+	app.AddRoute("GET", "/", handler)
+	app.Listen()
 }
