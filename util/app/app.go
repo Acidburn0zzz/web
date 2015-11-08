@@ -2,14 +2,18 @@ package app
 
 import (
 	"fmt"
-	"github.com/bradfitz/http2"
-	"github.com/gorilla/mux"
 	"log"
 	"net/http"
 	"os"
+
+	"github.com/bradfitz/http2"
+	"github.com/gorilla/mux"
+	"github.com/justinas/alice"
 	"upper.io/db"
 	"upper.io/db/postgresql"
 )
+
+var database db.Database
 
 // App encapuslates some common shit
 type App struct {
@@ -20,6 +24,8 @@ type App struct {
 	port     string
 	certPath string
 	keyPath  string
+
+	hasMigrations bool
 }
 
 // NewApp creates a new App
@@ -33,9 +39,11 @@ func NewApp(port int) *App {
 
 	a.Router = mux.NewRouter().StrictSlash(true)
 
+	chain := alice.New().Then(a.Router)
+
 	a.Server = &http.Server{
 		Addr:    a.port,
-		Handler: a.Router,
+		Handler: chain,
 	}
 
 	http2.ConfigureServer(a.Server, nil)
@@ -44,12 +52,17 @@ func NewApp(port int) *App {
 }
 
 // AddRoute adds a route
-func (a App) AddRoute(method string, path string, route http.HandlerFunc) {
+func (a *App) AddRoute(method string, path string, route http.HandlerFunc) {
+	// a.Router.Methods(method).Path(path).Handler(
+	// 	func(w http.ResponseWriter, r *http.Request) http.HandlerFunc {
+	// 		route(w, r)
+	// 	},
+	// )
 	a.Router.Methods(method).Path(path).Handler(route)
 }
 
 // Listen starts a HTTP2 server
-func (a App) Listen() {
+func (a *App) Listen() {
 	if a.certificatesExist() {
 		log.Printf("Starting Application. Listening on port :%s\n", a.port)
 		a.Server.ListenAndServeTLS(a.certPath, a.keyPath)
@@ -57,13 +70,14 @@ func (a App) Listen() {
 }
 
 // AddDatabase connects to a psql db with the given name.
-func (a App) AddDatabase(name string, user string) {
+func (a *App) AddDatabase(name string, user string) {
 	settings := postgresql.ConnectionURL{
 		Database: name,
 		User:     user,
 	}
 
-	database, err := db.Open(postgresql.Adapter, settings)
+	var err error
+	database, err = db.Open(postgresql.Adapter, settings)
 
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %s with user %s - %s\n", name, user, err.Error())
@@ -76,7 +90,7 @@ func (a App) AddDatabase(name string, user string) {
 	a.Database = &database
 }
 
-func (a App) certificatesExist() bool {
+func (a *App) certificatesExist() bool {
 	if _, err := os.Stat(a.certPath); os.IsNotExist(err) {
 		log.Printf("Failed to find certificate: (%s)\n", a.certPath)
 		return false
