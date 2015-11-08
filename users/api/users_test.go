@@ -3,8 +3,6 @@ package api
 import "testing"
 
 func TestUser_Valid(t *testing.T) {
-	t.Parallel()
-
 	// empty user is not valid
 	u := &User{}
 
@@ -40,14 +38,48 @@ func TestUser_Valid(t *testing.T) {
 	if u.Valid() {
 		t.Error("missing last name should be invalid")
 	}
+
+	u = buildValidUser()
+	u.Username = ""
+
+	if u.Valid() {
+		t.Error("missing username should be invalid")
+	}
 }
 
-func buildValidUser() *User {
-	return &User{
-		FirstName: "John",
-		LastName:  "Carmack",
-		Address:   "somewhere in texas",
-		Phone:     "+123 123 1234",
-		Email:     "johnc@idsoftware.com",
+func TestUser_Find(t *testing.T) {
+	truncateUsers()
+
+	_, err := UserFind("foo")
+	expectNil(t, err)
+
+	u := buildValidUser()
+	u.Save()
+	u2, err := UserFind(u.ID)
+
+	expectNil(t, err)
+	expectNotNil(t, u2)
+}
+
+func TestUser_Create(t *testing.T) {
+	truncateUsers()
+
+	u := buildValidUser()
+
+	// invalid user
+	u.Username = ""
+	succ := u.Save()
+
+	if succ == true {
+		t.Error("Save should have failed as user is invalid")
 	}
+
+	u.Username = "jc"
+	succ = u.Save()
+
+	if succ == false {
+		t.Error("Save should have been successful")
+	}
+
+	expectPresent(t, "ID", u.ID)
 }

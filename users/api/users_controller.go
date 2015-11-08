@@ -2,18 +2,14 @@ package api
 
 import (
 	"encoding/json"
-	// fuck off
-	_ "github.com/davecgh/go-spew/spew"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
-)
 
-// ErrorJSON is a simple blew
-type ErrorJSON struct {
-	Errors []string `json:"errors"`
-}
+	"github.com/gorilla/mux"
+)
 
 // UserCreate POST - Create a User
 //
@@ -38,6 +34,7 @@ type ErrorJSON struct {
 //	 ]
 // }
 func UserCreate(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("create")
 	w.Header().Set("Content-Type", "application/json")
 
 	u := User{}
@@ -54,6 +51,12 @@ func UserCreate(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error: %s\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
+	}
+
+	if u.Create() {
+		w.WriteHeader(http.StatusCreated)
+	} else {
+		w.WriteHeader(http.StatusNotAcceptable)
 	}
 
 	userResponse(w, u)
@@ -79,5 +82,20 @@ func userResponse(w http.ResponseWriter, u User) {
 }
 
 func usersIndex(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("index")
 	io.WriteString(w, "Welcome to the Dashboard")
+}
+
+func usersRead(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	if u, err := UserFind(id); err == nil {
+		if err = json.NewEncoder(w).Encode(u); err != nil {
+			log.Printf("Error: %s\n", err)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	} else {
+		w.WriteHeader(http.StatusNotFound)
+	}
 }

@@ -3,46 +3,14 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	_ "github.com/davecgh/go-spew/spew"
-	. "net/http"
-	"strings"
+	"net/http"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
-func req(method string, url string, jsonRequest string) (*Response, error) {
-	params := strings.NewReader(jsonRequest)
-	fullURL := fmt.Sprintf("%s%s", server.URL, url)
-	req, err := NewRequest("POST", fullURL, params)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return DefaultClient.Do(req)
-}
-
-func expectStatus(t *testing.T, r *Response, expectedCode int) {
-	if r.StatusCode != expectedCode {
-		t.Error("Should have received status", expectedCode, "got", r.StatusCode)
-	}
-}
-
-func expectContentType(t *testing.T, r *Response, expectedContentType string) {
-	contentType := r.Header.Get("Content-Type")
-
-	if contentType != expectedContentType {
-		t.Error("Should have received Content-Type", expectedContentType, "got", contentType)
-	}
-}
-
-func expectStringEqual(t *testing.T, s string, e string) {
-	if s != e {
-		t.Error("Expected", s, "got", e)
-	}
-}
-
 func TestUserController_CreateUserSuccess(t *testing.T) {
-	params := `{"first_name":"John", "last_name":"Carmack", "email":"j@id.com"}`
+	params := buildValidUserJSON()
 	res, err := req("POST", "/", params)
 
 	if err != nil {
@@ -53,14 +21,45 @@ func TestUserController_CreateUserSuccess(t *testing.T) {
 	expectStatus(t, res, 201)
 	expectContentType(t, res, "application/json")
 
-	u := &User{}
-	if err := json.NewDecoder(res.Body).Decode(u); err != nil {
-		t.Error("Failed to decode JSON", err.Error())
+	u := decodeUser(t, res.Body)
+
+	expectNotNil(t, u.ID)
+	expectPresent(t, "ID", u.ID)
+	expectEqual(t, u.FirstName, "John")
+	expectEqual(t, u.LastName, "Carmack")
+	expectEqual(t, u.Email, "johnc@idsoftware.com")
+}
+
+func TestUserController_CreateUserPersisted(t *testing.T) {
+	truncateUsers()
+	params := buildValidUserJSON()
+	res, err := req("POST", "/", params)
+
+	if err != nil {
+		t.Error(err)
+		return
 	}
 
-	expectStringEqual(t, u.FirstName, "John")
-	expectStringEqual(t, u.LastName, "Carmack")
-	expectStringEqual(t, u.Email, "j@id.com")
+	expectStatus(t, res, 201)
+	u := decodeUser(t, res.Body)
+
+	UserCount()
+
+	path := fmt.Sprintf("/%s", u.ID)
+
+	spew.Dump(path)
+
+	res, err = req("GET", path, "")
+
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	expectStatus(t, res, 200)
+	u2 := decodeUser(t, res.Body)
+
+	expectEqual(t, u.ID, u2.ID)
 }
 
 func TestUserController_CreateUserMalformedJSON(t *testing.T) {
@@ -86,7 +85,7 @@ func TestUserController_CreateUserInvalid(t *testing.T) {
 		t.Error(err)
 	}
 
-	expectStatus(t, res, 400)
+	expectStatus(t, res, http.StatusNotAcceptable)
 	expectContentType(t, res, "application/json")
 
 	e := &ErrorJSON{}
@@ -94,8 +93,8 @@ func TestUserController_CreateUserInvalid(t *testing.T) {
 		t.Error("Failed to decode JSON", err.Error())
 	}
 
-	if len(e.Errors) != 3 {
+	if len(e.Errors) != 4 {
 		t.Error(e.Errors)
-		t.Error("Should have 3 validation errors. Got", len(e.Errors))
+		t.Error("Should have 4 validation errors. Got", len(e.Errors))
 	}
 }
